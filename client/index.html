@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real Estate Voice Agent — Test Console</title>
+    <link rel="stylesheet" href="/assets/css/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <!-- Header -->
+      <header class="header">
+        <div class="badge">Phase 1 · Local Testing</div>
+        <h1>Real Estate Voice Agent</h1>
+        <p class="subtitle">
+          Test the AI sales agent using your laptop microphone and speakers.
+        </p>
+      </header>
+
+      <!-- Connection status indicator -->
+      <section class="status-card">
+        <div class="status-row">
+          <span id="status-dot" class="status-dot idle"></span>
+          <span id="status-text" class="status-text">Idle — ready to connect</span>
+        </div>
+        <p id="status-detail" class="status-detail">
+          Click <strong>Start Conversation</strong> to begin. Allow microphone access when prompted.
+        </p>
+      </section>
+
+      <!-- Start / Stop controls -->
+      <section class="controls">
+        <button id="start-btn" class="btn btn-start" type="button">
+          Start Conversation
+        </button>
+        <button id="stop-btn" class="btn btn-stop" type="button" disabled>
+          Stop Conversation
+        </button>
+      </section>
+
+      <!-- Live transcript area -->
+      <section class="transcript-card">
+        <h2>Live Transcript</h2>
+        <div id="transcript" class="transcript" aria-live="polite">
+          <p class="transcript-placeholder">Transcript will appear here during the conversation…</p>
+        </div>
+      </section>
+
+      <!-- Pipeline info -->
+      <section class="info-card">
+        <h2>Pipeline</h2>
+        <ul class="pipeline-list">
+          <li><span class="tag stt">STT</span> Deepgram — speech to text</li>
+          <li><span class="tag llm">LLM</span> Gemini — generates responses</li>
+          <li><span class="tag tts">TTS</span> Cartesia — text to speech</li>
+        </ul>
+      </section>
+    </main>
+
+    <!-- Pipecat client SDK (loaded as ES modules) -->
+    <script type="module" src="/assets/js/app.js"></script>
+  </body>
+</html>

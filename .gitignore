@@ -1,0 +1,22 @@
+# Environment files with secrets
+.env
+server/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ruff_cache/
+
+# Pipecat eval artifacts
+*.eval.log
+*.debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if added later)
+node_modules/
