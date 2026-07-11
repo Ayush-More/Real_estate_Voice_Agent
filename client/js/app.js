@@ -18,6 +18,8 @@ const transcriptEl = document.getElementById("transcript");
 
 // Pipecat client instance (created on first connect)
 let pcClient = null;
+let remoteAudioEl = null;
+let remoteAudioContext = null;
 
 /** Update the UI status indicator */
 function setStatus(state, text, detail = "") {
@@ -45,6 +47,52 @@ function clearTranscript() {
     '<p class="transcript-placeholder">Transcript will appear here during the conversation…</p>';
 }
 
+function ensureRemoteAudioPlayback() {
+  if (!remoteAudioEl) {
+    remoteAudioEl = document.createElement("audio");
+    remoteAudioEl.autoplay = true;
+    remoteAudioEl.playsInline = true;
+    remoteAudioEl.setAttribute("playsinline", "true");
+    remoteAudioEl.volume = 1.0;
+    document.body.appendChild(remoteAudioEl);
+  }
+
+  if (!remoteAudioContext) {
+    remoteAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  if (remoteAudioContext.state === "suspended") {
+    remoteAudioContext.resume().catch((err) => {
+      console.warn("AudioContext resume failed:", err);
+    });
+  }
+}
+
+function attachRemoteAudioTrack(track) {
+  if (!track || track.kind !== "audio") return;
+
+  ensureRemoteAudioPlayback();
+
+  const stream = new MediaStream();
+  stream.addTrack(track);
+
+  remoteAudioEl.srcObject = stream;
+  remoteAudioEl.muted = false;
+  remoteAudioEl.volume = 1.0;
+
+  const playPromise = remoteAudioEl.play();
+  if (playPromise) {
+    playPromise.catch((err) => {
+      console.warn("Remote audio play failed; retrying on next interaction:", err);
+      document.addEventListener(
+        "click",
+        () => remoteAudioEl.play().catch(() => {}),
+        { once: true }
+      );
+    });
+  }
+}
+
 /** Create and configure the Pipecat client */
 function createClient() {
   return new PipecatClient({
@@ -57,11 +105,16 @@ function createClient() {
     callbacks: {
       // --- Connection lifecycle events ---
       onConnected: () => {
+        ensureRemoteAudioPlayback();
         setStatus("connected", "Connected — agent is listening", "Speak naturally. The agent will respond when you pause.");
         startBtn.disabled = true;
         stopBtn.disabled = false;
       },
       onDisconnected: () => {
+        if (remoteAudioEl) {
+          remoteAudioEl.pause();
+          remoteAudioEl.srcObject = null;
+        }
         setStatus("idle", "Idle — ready to connect", "Click Start Conversation to begin a new session.");
         startBtn.disabled = false;
         stopBtn.disabled = true;
@@ -73,6 +126,11 @@ function createClient() {
         stopBtn.disabled = true;
       },
 
+      onTrackStarted: (track, participant) => {
+        console.log("TRACK STARTED:", track.kind, track.readyState, track.muted, participant);
+        if (participant?.local || track.kind !== "audio") return;
+        attachRemoteAudioTrack(track);
+      },
       // --- Transcript events (when bot/user speaks) ---
       onUserTranscript: (data) => {
         if (data?.text) appendTranscript("user", data.text);

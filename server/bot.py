@@ -1,7 +1,7 @@
 #
 # Real Estate Voice Agent — Phase 1 (Local Testing)
 #
-# Pipeline: Microphone → Deepgram STT → Gemini LLM → Cartesia TTS → Speaker
+# Pipeline: Microphone → Deepgram STT → Gemini LLM → Sarvam TTS → Speaker
 # Transport: SmallWebRTC (browser mic/speaker via custom frontend)
 #
 # Run:
@@ -37,10 +37,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.groq.llm import GroqLLMService
+from pipecat.services.sarvam.tts import SarvamTTSService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transcriptions.language import Language
 from pipecat.workers.runner import WorkerRunner
 
 # Load API keys from server/.env
@@ -69,13 +70,20 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     logger.info("Starting Real Estate Voice Agent session")
 
     # --- Speech-to-Text: converts microphone audio to text ---
-    stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
+    stt = DeepgramSTTService(
+        api_key=os.environ["DEEPGRAM_API_KEY"],
+        settings=DeepgramSTTService.Settings(
+            language=Language.EN,
+            model=os.getenv("DEEPGRAM_STT_MODEL", "nova-3-general"),
+            interim_results=True,
+        ),
+    )
 
     # --- LLM: Gemini generates salesperson responses ---
-    llm = GoogleLLMService(
-        api_key=os.environ["GOOGLE_API_KEY"],
-        settings=GoogleLLMService.Settings(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+    llm = GroqLLMService(
+        api_key=os.environ["GROQ_API_KEY"],
+        settings=GroqLLMService.Settings(
+            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
             system_instruction=REAL_ESTATE_SYSTEM_PROMPT,
             temperature=0.7,
             max_tokens=1024,
@@ -83,13 +91,19 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     )
 
     # --- Text-to-Speech: converts agent text to natural voice ---
-    tts = CartesiaTTSService(
-        api_key=os.environ["CARTESIA_API_KEY"],
-        settings=CartesiaTTSService.Settings(
-            voice=os.getenv(
-                "CARTESIA_VOICE_ID",
-                "71a7ad14-091c-4e8e-a314-022ece01c121",  # Friendly professional voice
-            ),
+    sarvam_api_key = os.getenv("SARVAM_API_KEY") or os.getenv("CARTESIA_API_KEY")
+    if not sarvam_api_key:
+        raise RuntimeError("Missing Sarvam API key. Set SARVAM_API_KEY in server/.env.")
+
+    tts = SarvamTTSService(
+        api_key=sarvam_api_key,
+        settings=SarvamTTSService.Settings(
+            voice=os.getenv("SARVAM_VOICE_ID", "eva"),
+            model=os.getenv("SARVAM_MODEL", "bulbul:v3"),
+            language=Language.EN_IN,
+            pace=1.0,
+            temperature=0.6,
+            enable_preprocessing=True,
         ),
     )
 
@@ -126,6 +140,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     # When the browser client is ready, kick off the opening greeting
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(_rtvi):
+        context.add_message(
+            {
+                "role": "developer",
+                "content": (
+                    "Always respond in English only, using natural conversational English. "
+                    "Keep replies short, warm, and conversational."
+                ),
+            }
+        )
         context.add_message({"role": "developer", "content": REAL_ESTATE_GREETING_TRIGGER})
         await worker.queue_frames([LLMRunFrame()])
 
