@@ -7,12 +7,21 @@ dependencies = [
     "pipecat-ai[deepgram,groq,runner,sarvam,silero,webrtc]>=1.4.0",
     "python-dotenv>=1.0.0",
     "loguru>=0.7.0",
+    "sqlalchemy>=2.0.0,<3",
+    "psycopg[binary]>=3.1.0",
+    "pydantic>=2.0.0,<3",
+    "pydantic-settings>=2.0.0,<3",
+    "pypdf>=5.0.0",
+    "langchain-text-splitters>=0.3.0",
+    "sentence-transformers>=3.0.0",
+    "qdrant-client>=1.11.0",
 ]
 
 [dependency-groups]
 dev = [
     "pyright>=1.1.404,<2",
     "ruff>=0.12.11,<1",
+    "reportlab>=4.0.0,<5",
 ]
 
 [tool.ruff]
