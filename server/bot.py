@@ -107,8 +107,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         ),
     )
 
+    # --- Register Tools ---
+    from tools import search_properties, search_documents
+    
+    llm.register_function("search_properties", search_properties)
+    llm.register_function("search_documents", search_documents)
+    
     # Conversation memory + voice activity detection for turn-taking
-    context = LLMContext()
+    context = LLMContext(tools=llm.get_tools())
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
