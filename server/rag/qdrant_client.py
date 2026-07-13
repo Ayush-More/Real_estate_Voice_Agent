@@ -47,6 +47,17 @@ class QdrantService:
                 logger.info(f"Created Qdrant collection: {self.collection_name}")
             else:
                 logger.info(f"Qdrant collection {self.collection_name} already exists.")
+                
+            # Ensure payload index exists for project_name to allow filtering
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name="project_name",
+                    field_schema=qmodels.PayloadSchemaType.KEYWORD
+                )
+            except Exception as e:
+                # Might already exist
+                logger.debug(f"Payload index creation note (might already exist): {e}")
         except Exception as e:
             logger.error(f"Error ensuring collection exists: {e}")
             raise
@@ -108,6 +119,43 @@ class QdrantService:
         )
         logger.info(f"Successfully inserted {len(points)} chunks into {self.collection_name}.")
 
+    def search_chunks(self, query_vector: List[float], top_k: int = 3, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """Search for the most relevant text chunks."""
+        query_filter = None
+        if filters:
+            must_conditions = []
+            for key, value in filters.items():
+                must_conditions.append(
+                    qmodels.FieldCondition(
+                        key=key,
+                        match=qmodels.MatchValue(value=value)
+                    )
+                )
+            if must_conditions:
+                query_filter = qmodels.Filter(must=must_conditions)
+
+        try:
+            search_result = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                query_filter=query_filter,
+                limit=top_k,
+                with_payload=True
+            ).points
+            
+            # Format results
+            results = []
+            for point in search_result:
+                if point.payload:
+                    results.append({
+                        "score": point.score,
+                        "text": point.payload.get("text", ""),
+                        "metadata": {k: v for k, v in point.payload.items() if k != "text"}
+                    })
+            return results
+        except Exception as e:
+            logger.error(f"Error during Qdrant search: {e}")
+            return []
 # Singleton instance
 _qdrant_service = None
 
